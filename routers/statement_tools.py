@@ -286,19 +286,22 @@ def _in_range(day: Optional[date], start: Optional[date], end: Optional[date]) -
 
 
 def _filtered_rows(
-    rows: List[Dict[str, Any]], start: Optional[date], end: Optional[date]
+    rows: List[Dict[str, Any]], start: Optional[date], end: Optional[date], direction: Optional[str] = None
 ) -> Tuple[List[Tuple[Optional[date], Dict[str, Any]]], bool]:
-    """Parse dates once, filter to the period, sort newest first (undated last).
+    """Parse dates once, filter to the period (and direction, if given), sort newest first (undated last).
 
-    Returns ``(rows, truncated)``: at most the newest ``_MAX_ROWS`` rows of the period,
-    and whether more rows than that matched it.
+    Returns ``(rows, truncated)``: at most the newest ``_MAX_ROWS`` matching rows, and
+    whether more rows than that matched.
     """
     filtered: List[Tuple[Optional[date], Dict[str, Any]]] = []
     for tx in rows:
         day = _parse_date(tx.get("date"))
         if not _in_range(day, start, end):
             continue
-        filtered.append((day, _row(tx)))
+        row = _row(tx)
+        if direction is not None and row["direction"] != direction:
+            continue
+        filtered.append((day, row))
     filtered.sort(key=lambda pair: (pair[0] is None, -(pair[0].toordinal() if pair[0] else 0)))
     return filtered[:_MAX_ROWS], len(filtered) > _MAX_ROWS
 
@@ -313,7 +316,7 @@ def _period_note(raw_truncated: bool, has_more: bool) -> str:
         note += " More matching rows exist beyond this page — raise offset or limit to fetch them."
     if raw_truncated:
         note += (
-            " More than 500 rows match this period (this tool's working cap), so only the newest 500"
+            " More than 500 rows match this period and direction (this tool's working cap), so only the newest 500"
             " are part of this answer — narrow the date range and ask again for the older ones."
         )
     return note
@@ -363,9 +366,7 @@ async def get_account_statement(
     if failure:
         return failure
 
-    matched, raw_truncated = _filtered_rows(rows, start, end)
-    if direction is not None:
-        matched = [item for item in matched if item[1]["direction"] == direction]
+    matched, raw_truncated = _filtered_rows(rows, start, end, direction)
 
     total = len(matched)
     page = [item[1] for item in matched[offset : offset + limit]]

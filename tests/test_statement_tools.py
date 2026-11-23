@@ -253,6 +253,20 @@ async def test_statement_reaches_an_old_period_behind_the_working_cap(
 @pytest.mark.asyncio
 @patch("routers.statement_tools.make_request", new_callable=AsyncMock)
 @patch("routers.statement_tools.get_auth_header")
+async def test_statement_applies_direction_before_the_working_cap(mock_get_auth_header, mock_make_request, mock_auth):
+    mock_get_auth_header.return_value = mock_auth
+    mock_make_request.return_value = savings_response(LONG_HISTORY)
+
+    # The 600 newer withdrawals must not use up the cap before the deposits are reached
+    result = await get_account_statement(7, direction="credit")
+
+    assert result["total_matching"] == 5
+    assert result["truncated"] is False
+
+
+@pytest.mark.asyncio
+@patch("routers.statement_tools.make_request", new_callable=AsyncMock)
+@patch("routers.statement_tools.get_auth_header")
 async def test_spending_summary_of_an_old_period_behind_the_working_cap(
     mock_get_auth_header, mock_make_request, mock_auth
 ):
