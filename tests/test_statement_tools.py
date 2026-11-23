@@ -354,7 +354,9 @@ async def test_find_recurring_payments_ignores_reversed_debits(mock_get_auth_hea
     mock_get_auth_header.return_value = mock_auth
     # Three monthly debits, all of them reversed, are not a recurring payment
     reversed_monthly = [{**tx(i, [2026, i, 5], 250, "Withdrawal"), "reversed": True} for i in (1, 2, 3)]
-    mock_make_request.return_value = savings_response(reversed_monthly)
+    # A reversed deposit could never be a recurring payment, so it isn't counted as skipped
+    reversed_deposit = {**tx(4, [2026, 2, 10], 900, "Deposit"), "reversed": True}
+    mock_make_request.return_value = savings_response(reversed_monthly + [reversed_deposit])
 
     result = await find_recurring_payments(7)
 

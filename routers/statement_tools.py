@@ -199,8 +199,10 @@ def _row(tx: Dict[str, Any]) -> Dict[str, Any]:
         "running_balance": _amount(tx.get("runningBalance")),
         "type": type_name,
         "reversed": bool(tx.get("reversed") or tx.get("manuallyReversed")),
-        # The row that the reverse command adds for an earlier transaction
-        "reversal": bool(tx.get("isReversal") or tx.get("reversalTransaction")),
+        # The row that the reverse command adds for an earlier transaction. Fineract's JSON
+        # has only isReversal: reversalTransaction is in its OpenAPI spec (from the
+        # isReversalTransaction() getter) but never in a response.
+        "reversal": bool(tx.get("isReversal")),
     }
 
 
@@ -520,10 +522,10 @@ async def find_recurring_payments(
     amounts: Dict[Tuple[str, str], float] = {}
     reversed_skipped = 0
     for day, item in _filtered_rows(rows, start, end):
+        if item["direction"] != "debit" or item["amount"] is None or day is None:
+            continue
         if _cancelled(item):
             reversed_skipped += 1
-            continue
-        if item["direction"] != "debit" or item["amount"] is None or day is None:
             continue
         key = (str(item["type"] or "unclassified"), f"{abs(item['amount']):.2f}")
         groups.setdefault(key, []).append(day)
